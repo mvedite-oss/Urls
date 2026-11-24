@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% if page == 'index' %}MV MODES — Jogos, Mods e Downloads{% elif page == 'item' or page == 'download' %}{{ item.title }} — MV MODES{% elif page == 'token' %}{{ token.title }} — MV MODES{% elif page == 'search' %}Busca — MV MODES{% elif page == 'admin_login' %}Login ADM — MV MODES{% elif page == 'admin' %}Painel ADM — MV MODES{% endif %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="{{ url_for('index') }}" class="logo">
+      <span class="logo-mv">MV</span><span class="logo-modes">MODES</span>
+    </a>
+    <nav class="main-nav">
+      <a href="{{ url_for('index') }}#populares">Jogos</a>
+      <a href="{{ url_for('index') }}#mods">Mods</a>
+      <a href="{{ url_for('index') }}#arquivos">Arquivos</a>
+      <a href="{{ url_for('admin_dashboard') if session.get('admin_id') else url_for('admin_login') }}" class="nav-admin">ADM</a>
+    </nav>
+  </div>
+</header>
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+{% if msgs %}
+<div class="container flash-wrap">
+  {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% macro card(item) %}
+<article class="card">
+  <a href="{{ url_for('item_detail', item_id=item.id) }}" class="card-cover">
+    {% if item.cover_image %}
+    <img src="{{ url_for('uploaded_image', filename=item.cover_image) }}" alt="{{ item.title }}">
+    {% else %}<div class="card-cover-placeholder">MV</div>{% endif %}
+    <span class="card-cat">{{ item.cat or 'Geral' }}</span>
+  </a>
+  <div class="card-body">
+    <h3 class="card-title">{{ item.title }}</h3>
+    <p class="card-desc">{{ (item.short_description or item.description or '')[:90] }}</p>
+    <div class="card-meta">
+      <span>{{ (item.published_at or '')[:10] }}</span>
+      <span>⬇ {{ item.download_count }}</span>
+    </div>
+    <div class="card-actions">
+      <a href="{{ url_for('item_detail', item_id=item.id) }}" class="btn btn-sm btn-ghost">VER DETALHES</a>
+      <a href="{{ url_for('download_page', item_id=item.id) }}" class="btn btn-sm btn-primary">BAIXAR</a>
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+{% if page == 'index' %}
+
+{% if featured %}
+<section class="hero">
+  <div class="hero-bg" {% if featured.cover_image %}style="background-image:url('{{ url_for('uploaded_image', filename=featured.cover_image) }}')"{% endif %}></div>
+  <div class="hero-overlay"></div>
+  <div class="container hero-content">
+    <span class="hero-badge">🔥 DESTAQUE</span>
+    <h1 class="hero-title">{{ featured.title }}</h1>
+    <p class="hero-desc">{{ featured.short_description or (featured.description or '')[:180] }}</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('item_detail', item_id=featured.id) }}" class="btn btn-primary">VER DETALHES</a>
+      <a href="{{ url_for('download_page', item_id=featured.id) }}" class="btn btn-ghost">BAIXAR</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="container section search-section">
+  <form action="{{ url_for('search') }}" method="get" class="search-form">
+    <input type="text" name="q" placeholder="Pesquisar jogos, mods, arquivos..." value="{{ request.args.get('q','') }}">
+    <button type="submit">PESQUISAR</button>
+  </form>
+</section>
+
+<section class="container section" id="populares">
+  <div class="section-head">
+    <h2 class="section-title">Jogos Populares</h2>
+    <a href="{{ url_for('search', type='game') }}" class="see-all">Ver tudo →</a>
+  </div>
+  <div class="card-grid">
+    {% for item in popular %}{{ card(item) }}{% else %}
+    <p class="empty">Nenhum jogo cadastrado ainda.</p>{% endfor %}
+  </div>
+</section>
+
+<section class="container section" id="mods">
+  <div class="section-head">
+    <h2 class="section-title">Mods Recentes</h2>
+    <a href="{{ url_for('search', type='mod') }}" class="see-all">Ver tudo →</a>
+  </div>
+  <div class="card-grid">
+    {% for item in mods %}{{ card(item) }}{% else %}
+    <p class="empty">Nenhum mod cadastrado ainda.</p>{% endfor %}
+  </div>
+</section>
+
+<section class="container section" id="arquivos">
+  <div class="section-head">
+    <h2 class="section-title">Arquivos Recentes</h2>
+    <a href="{{ url_for('search', type='file') }}" class="see-all">Ver tudo →</a>
+  </div>
+  <div class="card-grid">
+    {% for item in files %}{{ card(item) }}{% else %}
+    <p class="empty">Nenhum arquivo cadastrado ainda.</p>{% endfor %}
+  </div>
+</section>
+
+{% elif page == 'search' %}
+
+<section class="container section">
+  <h1 class="section-title">{% if q %}Resultados para "{{ q }}"{% else %}Todos os itens{% endif %}</h1>
+  <div class="card-grid" style="margin-top:20px;">
+    {% for item in items %}{{ card(item) }}{% else %}
+    <p class="empty">Nada encontrado.</p>{% endfor %}
+  </div>
+</section>
+
+{% elif page == 'item' %}
+
+<section class="item-page container">
+  <div class="item-layout">
+    <div class="item-cover">
+      {% if item.cover_image %}
+      <img src="{{ url_for('uploaded_image', filename=item.cover_image) }}" alt="{{ item.title }}">
+      {% else %}<div class="card-cover-placeholder big">MV</div>{% endif %}
+    </div>
+    <div class="item-info">
+      <span class="tag">{{ item.cat or 'Geral' }}</span>
+      <h1>{{ item.title }}</h1>
+      <p class="desc">{{ item.description or item.short_description }}</p>
+      <div class="info-grid">
+        <div><span>Versão</span><strong>{{ item.version or '—' }}</strong></div>
+        <div><span>Tamanho</span><strong>{% if item.file_size %}{{ (item.file_size / 1048576)|round(1) }} MB{% else %}—{% endif %}</strong></div>
+        <div><span>Publicado</span><strong>{{ (item.published_at or '')[:10] }}</strong></div>
+        <div><span>Downloads</span><strong>{{ item.download_count }}</strong></div>
+      </div>
+      {% if item.file_path %}
+      <a href="{{ url_for('download_page', item_id=item.id) }}" class="btn btn-primary btn-lg">BAIXAR</a>
+      {% else %}
+      <p class="error">Arquivo ainda não disponível.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% elif page == 'download' %}
+
+<section class="download-page container">
+  <div class="download-layout">
+    <div class="download-cover">
+      {% if item.cover_image %}
+      <img src="{{ url_for('uploaded_image', filename=item.cover_image) }}" alt="{{ item.title }}">
+      {% else %}<div class="card-cover-placeholder big">MV</div>{% endif %}
+    </div>
+    <div class="download-info">
+      <span class="tag">{{ item.cat or 'Geral' }}</span>
+      <h1>{{ item.title }}</h1>
+      <p class="desc">{{ item.description or item.short_description }}</p>
+      <div class="info-grid">
+        <div><span>Versão</span><strong>{{ item.version or '—' }}</strong></div>
+        <div><span>Tamanho</span><strong>{% if item.file_size %}{{ (item.file_size / 1048576)|round(1) }} MB{% else %}—{% endif %}</strong></div>
+        <div><span>Publicado</span><strong>{{ (item.published_at or '')[:10] }}</strong></div>
+        <div><span>Downloads</span><strong>{{ item.download_count }}</strong></div>
+      </div>
+      {% if not item.file_path %}
+        <p class="error">Arquivo ainda não disponível.</p>
+      {% elif not item.mission_enabled %}
+        <a href="{{ url_for('download_direct', item_id=item.id) }}" class="btn btn-primary btn-lg">BAIXAR AGORA</a>
+      {% else %}
+        <button id="start-mission-btn" class="btn btn-primary btn-lg" data-item-id="{{ item.id }}">INICIAR MISSÃO</button>
+        <p class="hint">Complete a missão de formas geométricas para liberar o download.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<div id="mission-modal" class="modal" hidden>
+  <div class="modal-content">
+    <button class="modal-close" id="modal-close">&times;</button>
+    <h2>Missão de Formas Geométricas</h2>
+    <p id="mission-status">Clique na forma solicitada</p>
+    <div class="mission-progress"><div id="mission-progress-bar"></div></div>
+    <div id="mission-target" class="mission-target"></div>
+    <div id="mission-options" class="mission-options"></div>
+    <div id="mission-feedback" class="mission-feedback"></div>
+    <div id="mission-success" class="mission-success" hidden>
+      <p>✅ Missão concluída!</p>
+      <a id="download-now-link" class="btn btn-primary btn-lg" href="#">BAIXAR AGORA</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHAPE_SVGS = {
+  triangulo: '<polygon points="50,8 92,90 8,90"/>',
+  quadrado:  '<rect x="12" y="12" width="76" height="76" rx="6"/>',
+  circulo:   '<circle cx="50" cy="50" r="42"/>',
+  trapezio:  '<polygon points="28,18 72,18 94,86 6,86"/>',
+  losango:   '<polygon points="50,6 94,50 50,94 6,50"/>',
+  pentagono: '<polygon points="50,5 92.8,36.1 76.5,86.4 23.5,86.4 7.2,36.1"/>',
+  hexagono:  '<polygon points="50,5 88.97,27.5 88.97,72.5 50,95 11.03,72.5 11.03,27.5"/>'
+};
+const SHAPE_LABELS = {triangulo:'Triângulo', quadrado:'Quadrado', circulo:'Círculo',
+  trapezio:'Trapézio', losango:'Losango', pentagono:'Pentágono', hexagono:'Hexágono'};
+const shapeSVG = n => `<svg viewBox="0 0 100 100" class="shape-svg">${SHAPE_SVGS[n]}</svg>`;
+
+let state = { challengeId: null, total: 0, current: 0 };
+const modal = document.getElementById('mission-modal');
+const startBtn = document.getElementById('start-mission-btn');
+
+if (startBtn) {
+  startBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/mission/start', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ item_id: startBtn.dataset.itemId })
+    });
+    const data = await res.json();
+    if (!data.success) { alert(data.error || 'Erro'); return; }
+    state.challengeId = data.challenge_id;
+    state.total = data.total;
+    state.current = 0;
+    modal.hidden = false;
+    document.getElementById('mission-success').hidden = true;
+    document.getElementById('mission-feedback').textContent = '';
+    renderRound(data.round);
+  });
+}
+document.getElementById('modal-close').addEventListener('click', () => modal.hidden = true);
+
+function renderRound(round) {
+  state.current = round.index;
+  document.getElementById('mission-status').textContent =
+    `Rodada ${round.index + 1} de ${state.total} — Clique no ${SHAPE_LABELS[round.target]}`;
+  document.getElementById('mission-progress-bar').style.width = (round.index / state.total) * 100 + '%';
+  document.getElementById('mission-target').innerHTML =
+    `<div class="target-shape">${shapeSVG(round.target)}</div><span>Clique no <strong>${SHAPE_LABELS[round.target]}</strong></span>`;
+  const opts = document.getElementById('mission-options');
+  opts.innerHTML = '';
+  round.options.forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'shape-btn';
+    b.innerHTML = shapeSVG(name);
+    b.addEventListener('click', () => answer(name, b));
+    opts.appendChild(b);
+  });
+}
+
+async function answer(shape, btnEl) {
+  const res = await fetch('/api/mission/answer', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ challenge_id: state.challengeId, shape })
+  });
+  const data = await res.json();
+  const fb = document.getElementById('mission-feedback');
+  if (!data.success) { fb.textContent = data.error || 'Erro'; return; }
+  if (!data.correct) {
+    btnEl.classList.add('wrong');
+    fb.textContent = `❌ Errado! A forma era ${SHAPE_LABELS[data.expected]}. Tente novamente.`;
+    return;
+  }
+  btnEl.classList.add('correct');
+  fb.textContent = '✅ Correto!';
+  if (data.done) {
+    document.getElementById('mission-progress-bar').style.width = '100%';
+    document.getElementById('mission-options').innerHTML = '';
+    document.getElementById('mission-target').innerHTML = '';
+    document.getElementById('mission-success').hidden = false;
+    document.getElementById('download-now-link').href = data.download_url;
+    document.getElementById('mission-status').textContent = 'Missão concluída!';
+  } else {
+    setTimeout(() => renderRound(data.round), 500);
+  }
+}
+</script>
+
+{% elif page == 'token' %}
+
+<section class="download-page container">
+  <div class="download-layout">
+    <div class="download-cover">
+      {% if token.cover_image %}
+      <img src="{{ url_for('uploaded_image', filename=token.cover_image) }}" alt="{{ token.title }}">
+      {% else %}<div class="card-cover-placeholder big">MV</div>{% endif %}
+    </div>
+    <div class="download-info">
+      <span class="tag">{{ token.cat or 'Geral' }}</span>
+      <h1>{{ token.title }}</h1>
+      <p class="desc">{{ token.description or token.short_description }}</p>
+      <div class="info-grid">
+        <div><span>Versão</span><strong>{{ token.version or '—' }}</strong></div>
+        <div><span>Tamanho</span><strong>{% if token.file_size %}{{ (token.file_size / 1048576)|round(1) }} MB{% else %}—{% endif %}</strong></div>
+        <div><span>Publicado</span><strong>{{ (token.published_at or '')[:10] }}</strong></div>
+      </div>
+      <a href="{{ url_for('token_file', token=token.token) }}" class="btn btn-primary btn-lg">BAIXAR AGORA</a>
+    </div>
+  </div>
+</section>
+
+{% elif page == 'admin_login' %}
+
+<section class="login-page container">
+  <form method="post" class="login-card">
+    <h1><span class="logo-mv">MV</span><span class="logo-modes">MODES</span> <small>ADMIN</small></h1>
+    <label>Usuário<input type="text" name="username" required autofocus></label>
+    <label>Senha<input type="password" name="password" required></label>
+    <button type="submit" class="btn btn-primary btn-lg">ENTRAR</button>
+    <p class="hint">Padrão: admin / admin123 — troque em produção.</p>
+  </form>
+</section>
+
+{% elif page == 'admin' %}
+
+<section class="container admin-page">
+  <div class="admin-head">
+    <h1>Painel Administrativo</h1>
+    <a href="{{ url_for('admin_logout') }}" class="btn btn-ghost">SAIR</a>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><span>Jogos</span><strong>{{ stats.games }}</strong></div>
+    <div class="stat-card"><span>Mods</span><strong>{{ stats.mods }}</strong></div>
+    <div class="stat-card"><span>Arquivos</span><strong>{{ stats.files }}</strong></div>
+    <div class="stat-card"><span>Downloads</span><strong>{{ stats.downloads }}</strong></div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="tab-btn active" data-tab="tab-publications">Publicações</button>
+    <button class="tab-btn" data-tab="tab-form">{{ 'Editar' if edit_item else 'Nova Publicação' }}</button>
+    <button class="tab-btn" data-tab="tab-categories" id="categories">Categorias</button>
+    <button class="tab-btn" data-tab="tab-links" id="links">Links</button>
+  </div>
+
+  <div class="tab-pane active" id="tab-publications">
+    <table class="admin-table">
+      <thead><tr><th>ID</th><th>Capa</th><th>Título</th><th>Tipo</th><th>Categoria</th><th>Destaque</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.id }}</td>
+          <td>{% if it.cover_image %}<img src="{{ url_for('uploaded_image', filename=it.cover_image) }}" class="thumb">{% else %}—{% endif %}</td>
+          <td>{{ it.title }}</td>
+          <td><span class="badge badge-{{ it.type }}">{{ it.type }}</span></td>
+          <td>{{ it.cat or '—' }}</td>
+          <td>{% if it.is_featured %}⭐ {{ it.featured_order }}{% else %}—{% endif %}</td>
+          <td class="actions-cell">
+            <a href="{{ url_for('admin_dashboard', edit=it.id) }}#tab-form" class="btn btn-sm btn-ghost">Editar</a>
+            <form method="post" action="{{ url_for('admin_toggle_featured', item_id=it.id) }}" style="display:inline">
+              <button class="btn btn-sm btn-ghost">{{ 'Remover destaque' if it.is_featured else 'Destacar' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_item_delete', item_id=it.id) }}" style="display:inline" onsubmit="return confirm('Excluir?')">
+              <button class="btn btn-sm btn-danger">Excluir</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">Nenhuma publicação.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane" id="tab-form">
+    <form method="post"
+          action="{{ url_for('admin_item_edit', item_id=edit_item.id) if edit_item else url_for('admin_item_create') }}"
+          enctype="multipart/form-data" class="admin-form">
+      <div class="form-row">
+        <label>Título*<input type="text" name="title" required value="{{ edit_item.title if edit_item else '' }}"></label>
+        <label>Tipo
+          <select name="type">
+            <option value="game" {{ 'selected' if edit_item and edit_item.type=='game' }}>Jogo</option>
+            <option value="mod"  {{ 'selected' if edit_item and edit_item.type=='mod' }}>Mod</option>
+            <option value="file" {{ 'selected' if edit_item and edit_item.type=='file' }}>Arquivo</option>
+          </select>
+        </label>
+        <label>Categoria
+          <select name="category_id">
+            <option value="">— Sem categoria —</option>
+            {% for c in cats %}
+            <option value="{{ c.id }}" {{ 'selected' if edit_item and edit_item.category_id==c.id }}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Descrição curta<input type="text" name="short_description" value="{{ edit_item.short_description if edit_item else '' }}"></label>
+        <label>Versão<input type="text" name="version" value="{{ edit_item.version if edit_item else '' }}"></label>
+      </div>
+      <label>Descrição completa<textarea name="description" rows="4">{{ edit_item.description if edit_item else '' }}</textarea></label>
+      <div class="form-row">
+        <label>Capa (imagem)<input type="file" name="cover" accept="image/*"></label>
+        <label>Arquivo (APK/ZIP/RAR/7Z/OBB)<input type="file" name="file" accept=".apk,.zip,.rar,.7z,.obb"></label>
+      </div>
+      <div class="form-row">
+        <label>Missão: rodadas<input type="number" name="mission_rounds" min="1" max="10" value="{{ edit_item.mission_rounds if edit_item else 3 }}"></label>
+        <label>Opções por rodada<input type="number" name="mission_options" min="2" max="7" value="{{ edit_item.mission_options if edit_item else 4 }}"></label>
+        <label>Ordem de destaque<input type="number" name="featured_order" min="0" value="{{ edit_item.featured_order if edit_item else 0 }}"></label>
+      </div>
+      <div class="form-row checkbox-row">
+        <label><input type="checkbox" name="mission_enabled" {{ 'checked' if (not edit_item) or edit_item.mission_enabled }}> Exigir missão</label>
+        <label><input type="checkbox" name="is_featured" {{ 'checked' if edit_item and edit_item.is_featured }}> Destacar na capa</label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-lg">SALVAR</button>
+        {% if edit_item %}<a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost btn-lg">CANCELAR</a>{% endif %}
+      </div>
+    </form>
+  </div>
+
+  <div class="tab-pane" id="tab-categories">
+    <form method="post" action="{{ url_for('admin_category_create') }}" class="inline-form">
+      <input type="text" name="name" placeholder="Nova categoria" required>
+      <button class="btn btn-primary">ADICIONAR</button>
+    </form>
+    <ul class="cat-list">
+      {% for c in cats %}
+      <li>
+        <span>{{ c.name }}</span>
+        <form method="post" action="{{ url_for('admin_category_delete', cat_id=c.id) }}" onsubmit="return confirm('Excluir?')">
+          <button class="btn btn-sm btn-danger">Excluir</button>
+        </form
